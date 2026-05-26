@@ -1,6 +1,5 @@
 import streamlit as st
 import re
-import uuid
 from datetime import datetime
 from io import BytesIO
 from reportlab.pdfgen import canvas
@@ -81,20 +80,16 @@ if st.session_state["tipo"] == "NAVETTA":
         hub_num = "3489"
 
 # ============================================================
-# SC opzionale (senza suggerimenti del browser)
+# SC opzionale (accettiamo che il browser mostri la lista, ma puoi ignorarla)
 # ============================================================
 sc_choice = st.selectbox("Vuoi inserire un SC ufficiale UPS?", ["NO", "SI"], key="sc_choice")
 
 sc_value = None
 if st.session_state["sc_choice"] == "SI":
-
-    unique_name = f"sc_input_{uuid.uuid4().hex}"
-
     sc_value = st.text_input(
         "Inserisci SC (es: SC1234567890)",
         key="sc_value",
-        placeholder="SC1234567890",
-        kwargs={"name": unique_name}
+        placeholder="SC1234567890"
     ).upper()
 
     if sc_value and not re.match(r"^SC\d{10}$", sc_value):
@@ -110,9 +105,7 @@ with col_gen:
     genera = st.button("Genera PDF LQR")
 
 with col_reset:
-    if st.button("Reset campi"):
-        reset_fields()
-        st.experimental_rerun()
+    st.button("Reset campi", on_click=reset_fields)
 
 # ============================================================
 # GENERA PDF
