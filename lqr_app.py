@@ -182,7 +182,7 @@ if genera:
         renderPDF.draw(bc, c, 0, 0)
         c.restoreState()
 
-        text_y = y - 6
+        text_y = y - 12
 
         c.setFillColor(black)
         c.setFont("Helvetica", 8)
