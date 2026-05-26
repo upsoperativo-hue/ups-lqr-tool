@@ -172,7 +172,7 @@ if st.button("Genera PDF LQR"):
         c.restoreState()
 
         # testo subito sotto il barcode
-        text_y = y - 6
+        text_y = y - 12
 
         c.setFillColor(black)
         c.setFont("Helvetica", 8)
