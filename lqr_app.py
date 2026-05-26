@@ -164,7 +164,7 @@ if uploaded_pdf:
             # testo praticamente attaccato al barcode
             c.setFillColor(black)
             c.setFont("Helvetica", 8)
-            c.drawCentredString(box_x1 + box_w / 2, box_y1 + 2, value)
+            c.drawCentredString(box_x1 + box_w / 2, box_y1 + 6, value)
 
         # ------------------------------------------------------------
         # BARCODE TARGA
