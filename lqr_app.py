@@ -151,9 +151,9 @@ if uploaded_pdf:
                 (box_h * 0.6) / bc.height
             )
 
-            # barcode più vicino al testo
+            # barcode molto vicino al testo
             x = box_x1 + (box_w - bc.width * scale) / 2
-            y = box_y1 + (box_h - bc.height * scale) / 2 + 4
+            y = box_y1 + (box_h - bc.height * scale) / 2 + 2  # distanza minima
 
             c.saveState()
             c.translate(x, y)
@@ -161,10 +161,10 @@ if uploaded_pdf:
             renderPDF.draw(bc, c, 0, 0)
             c.restoreState()
 
-            # testo più vicino al barcode
+            # testo praticamente attaccato al barcode
             c.setFillColor(black)
             c.setFont("Helvetica", 8)
-            c.drawCentredString(box_x1 + box_w / 2, box_y1 + 6, value)
+            c.drawCentredString(box_x1 + box_w / 2, box_y1 + 2, value)
 
         # ------------------------------------------------------------
         # BARCODE TARGA
