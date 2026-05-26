@@ -132,7 +132,7 @@ if uploaded_pdf:
 
             # testo subito sotto il barcode (calcolato rispetto al fondo del barcode)
             barcode_bottom_y = y  # y è il bottom del barcode
-            text_y = barcode_bottom_y - 6  # 6 punti sotto il barcode
+            text_y = barcode_bottom_y - 8  # 6 punti sotto il barcode
 
             c.setFillColor(black)
             c.setFont("Helvetica", 8)
