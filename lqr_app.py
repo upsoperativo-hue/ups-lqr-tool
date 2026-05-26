@@ -12,6 +12,13 @@ from reportlab.lib.units import mm
 from pypdf import PdfReader, PdfWriter
 
 # ============================================================
+# INIZIALIZZAZIONE CHIAVI SESSION_STATE
+# ============================================================
+for key in ["targa", "tipo", "hub", "sc_choice", "sc_value"]:
+    if key not in st.session_state:
+        st.session_state[key] = ""
+
+# ============================================================
 # FUNZIONE RESET
 # ============================================================
 def reset_fields():
@@ -81,7 +88,6 @@ sc_choice = st.selectbox("Vuoi inserire un SC ufficiale UPS?", ["NO", "SI"], key
 sc_value = None
 if st.session_state["sc_choice"] == "SI":
 
-    # name HTML unico → il browser NON suggerisce più SC precedenti
     unique_name = f"sc_input_{uuid.uuid4().hex}"
 
     sc_value = st.text_input(
@@ -96,16 +102,22 @@ if st.session_state["sc_choice"] == "SI":
         sc_value = None
 
 # ============================================================
-# PULSANTE RESET MANUALE
+# SEZIONE COMANDI (GENERAZIONE + RESET A DESTRA)
 # ============================================================
-if st.button("Reset campi"):
-    reset_fields()
-    st.experimental_rerun()
+col_gen, col_reset = st.columns([4, 1])
+
+with col_gen:
+    genera = st.button("Genera PDF LQR")
+
+with col_reset:
+    if st.button("Reset campi"):
+        reset_fields()
+        st.experimental_rerun()
 
 # ============================================================
 # GENERA PDF
 # ============================================================
-if st.button("Genera PDF LQR"):
+if genera:
 
     if not targa:
         st.error("Inserisci una targa valida.")
@@ -119,9 +131,6 @@ if st.button("Genera PDF LQR"):
         st.error("Seleziona l'HUB.")
         st.stop()
 
-    # ------------------------------------------------------------
-    # CREA OVERLAY
-    # ------------------------------------------------------------
     overlay_buffer = BytesIO()
     c = canvas.Canvas(overlay_buffer, pagesize=letter)
 
@@ -130,12 +139,10 @@ if st.button("Genera PDF LQR"):
     c.setFillColor(black)
     c.drawString(100, 720, oggi)
 
-    # Codici fissi
     c.drawString(142, 720, "IT")
     c.drawString(170, 720, "4138")
     c.drawString(212, 720, "L")
 
-    # HUB dinamico
     if tipo == "NAVETTA":
         c.drawString(25, 618, hub_code)
         c.drawString(55, 618, hub_num)
@@ -151,21 +158,15 @@ if st.button("Genera PDF LQR"):
         c.drawString(55, 618, "2009")
         c.drawString(95, 618, "N")
 
-    # Targa
     c.drawCentredString(52, 705, targa)
 
-    # ------------------------------------------------------------
-    # FUNZIONE BARCODE + TESTO + RETTANGOLO
-    # ------------------------------------------------------------
     def draw_scaled_barcode(c, value, box_x1, box_y1, box_x2, box_y2):
         box_w = box_x2 - box_x1
         box_h = box_y2 - box_y1
 
-        # rettangolo bianco uniforme
         c.setFillColor(white)
         c.rect(box_x1, box_y1, box_w, box_h, fill=1, stroke=0)
 
-        # barcode vettoriale
         bc = createBarcodeDrawing(
             "Code128",
             value=value,
@@ -179,7 +180,6 @@ if st.button("Genera PDF LQR"):
             (box_h * 0.6) / bc.height
         )
 
-        # barcode centrato verticalmente
         x = box_x1 + (box_w - bc.width * scale) / 2
         y = box_y1 + (box_h - bc.height * scale) / 2
 
@@ -189,33 +189,23 @@ if st.button("Genera PDF LQR"):
         renderPDF.draw(bc, c, 0, 0)
         c.restoreState()
 
-        # testo subito sotto il barcode
         text_y = y - 6
 
         c.setFillColor(black)
         c.setFont("Helvetica", 8)
         c.drawCentredString(box_x1 + box_w / 2, text_y, value)
 
-    # ------------------------------------------------------------
-    # BARCODE TARGA
-    # ------------------------------------------------------------
     prefisso = prefissi[tipo]
     barcode_value = f"{prefisso}{targa}E"
 
     draw_scaled_barcode(c, barcode_value, 20, 140, 248, 240)
 
-    # ------------------------------------------------------------
-    # BARCODE SC (se presente)
-    # ------------------------------------------------------------
     if sc_value:
         draw_scaled_barcode(c, sc_value, 415, 140, 570, 240)
 
     c.save()
     overlay_buffer.seek(0)
 
-    # ------------------------------------------------------------
-    # MERGE PDF
-    # ------------------------------------------------------------
     overlay_pdf = PdfReader(overlay_buffer)
     writer = PdfWriter()
 
@@ -231,9 +221,6 @@ if st.button("Genera PDF LQR"):
 
     st.success("PDF generato correttamente.")
 
-    # ------------------------------------------------------------
-    # DOWNLOAD + RESET AUTOMATICO
-    # ------------------------------------------------------------
     st.download_button(
         "Scarica PDF",
         data=output_buffer.getvalue(),
