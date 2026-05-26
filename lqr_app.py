@@ -12,9 +12,6 @@ from pypdf import PdfReader, PdfWriter
 
 st.title("Compilatore LQR UPS — Barcode Vettoriali")
 
-# ============================================================
-# 1) UPLOAD PDF TEMPLATE
-# ============================================================
 uploaded_pdf = st.file_uploader("Carica il PDF LQR (es: LQR 2004.pdf)", type="pdf")
 
 if uploaded_pdf:
@@ -23,18 +20,12 @@ if uploaded_pdf:
 
     st.success("PDF LQR caricato correttamente.")
 
-    # ============================================================
-    # 2) INPUT TARGA
-    # ============================================================
     raw_targa = st.text_input("Inserisci la targa del mezzo/cassa:")
     targa = re.sub(r"[^A-Za-z0-9]", "", raw_targa).upper()
 
     if raw_targa and not targa:
         st.error("La targa deve contenere solo lettere e numeri.")
 
-    # ============================================================
-    # 3) INPUT TIPO
-    # ============================================================
     tipo = st.selectbox("Tipo mezzo", ["", "NAVETTA", "BILICO", "CASSA"])
 
     prefissi = {
@@ -43,9 +34,6 @@ if uploaded_pdf:
         "CASSA": "UPST"
     }
 
-    # ============================================================
-    # 4) HUB (solo NAVETTA)
-    # ============================================================
     hub = None
     hub_code = None
     hub_num = None
@@ -61,9 +49,6 @@ if uploaded_pdf:
             hub_code = "IT"
             hub_num = "3489"
 
-    # ============================================================
-    # 5) SC opzionale
-    # ============================================================
     sc_choice = st.selectbox("Vuoi inserire un SC ufficiale UPS?", ["NO", "SI"])
 
     sc_value = None
@@ -73,9 +58,6 @@ if uploaded_pdf:
             st.error("SC NON valido. Deve essere 'SC' + 10 numeri.")
             sc_value = None
 
-    # ============================================================
-    # 6) GENERA PDF
-    # ============================================================
     if st.button("Genera PDF LQR"):
 
         if not targa:
@@ -90,9 +72,6 @@ if uploaded_pdf:
             st.error("Seleziona l'HUB.")
             st.stop()
 
-        # ------------------------------------------------------------
-        # CREA OVERLAY
-        # ------------------------------------------------------------
         overlay_buffer = BytesIO()
         c = canvas.Canvas(overlay_buffer, pagesize=letter)
 
@@ -101,42 +80,33 @@ if uploaded_pdf:
         c.setFillColor(black)
         c.drawString(100, 720, oggi)
 
-        # Codici fissi
         c.drawString(142, 720, "IT")
         c.drawString(170, 720, "4138")
         c.drawString(212, 720, "L")
 
-        # HUB dinamico
         if tipo == "NAVETTA":
             c.drawString(25, 618, hub_code)
             c.drawString(55, 618, hub_num)
             c.drawString(95, 618, hub_letter)
-
         elif tipo == "CASSA":
             c.drawString(25, 618, "IT")
             c.drawString(55, 618, "4219")
             c.drawString(95, 618, "T")
-
         elif tipo == "BILICO":
             c.drawString(25, 618, "IT")
             c.drawString(55, 618, "2009")
             c.drawString(95, 618, "N")
 
-        # Targa
         c.drawCentredString(52, 705, targa)
 
-        # ------------------------------------------------------------
-        # FUNZIONE PER BARCODE VETTORIALE + TESTO + RETTANGOLO
-        # ------------------------------------------------------------
         def draw_scaled_barcode(c, value, box_x1, box_y1, box_x2, box_y2):
             box_w = box_x2 - box_x1
             box_h = box_y2 - box_y1
 
-            # rettangolo bianco pieno che COPRE il template
+            # patch bianco, stessa altezza per tutti
             c.setFillColor(white)
             c.rect(box_x1, box_y1, box_w, box_h, fill=1, stroke=0)
 
-            # barcode vettoriale
             bc = createBarcodeDrawing(
                 "Code128",
                 value=value,
@@ -145,15 +115,14 @@ if uploaded_pdf:
                 humanReadable=False
             )
 
-            # scala barcode per farlo stare nel box
             scale = min(
                 (box_w * 0.6) / bc.width,
                 (box_h * 0.6) / bc.height
             )
 
-            # barcode molto vicino al testo
+            # barcode centrato verticalmente nel rettangolo
             x = box_x1 + (box_w - bc.width * scale) / 2
-            y = box_y1 + (box_h - bc.height * scale) / 2 + 2  # distanza minima
+            y = box_y1 + (box_h - bc.height * scale) / 2
 
             c.saveState()
             c.translate(x, y)
@@ -161,31 +130,27 @@ if uploaded_pdf:
             renderPDF.draw(bc, c, 0, 0)
             c.restoreState()
 
-            # testo praticamente attaccato al barcode
+            # testo subito sotto il barcode (calcolato rispetto al fondo del barcode)
+            barcode_bottom_y = y  # y è il bottom del barcode
+            text_y = barcode_bottom_y - 6  # 6 punti sotto il barcode
+
             c.setFillColor(black)
             c.setFont("Helvetica", 8)
-            c.drawCentredString(box_x1 + box_w / 2, box_y1 + 6, value)
+            c.drawCentredString(box_x1 + box_w / 2, text_y, value)
 
-        # ------------------------------------------------------------
-        # BARCODE TARGA
-        # ------------------------------------------------------------
         prefisso = prefissi[tipo]
         barcode_value = f"{prefisso}{targa}E"
 
-        draw_scaled_barcode(c, barcode_value, 20, 118, 248, 240)
+        # stessa altezza rettangoli, barcodes allineati
+        # fascia verticale comune, es. 140–240
+        draw_scaled_barcode(c, barcode_value, 20, 140, 248, 240)
 
-        # ------------------------------------------------------------
-        # BARCODE SC (se presente)
-        # ------------------------------------------------------------
         if sc_value:
-            draw_scaled_barcode(c, sc_value, 415, 160, 570, 240)
+            draw_scaled_barcode(c, sc_value, 415, 140, 570, 240)
 
         c.save()
         overlay_buffer.seek(0)
 
-        # ------------------------------------------------------------
-        # MERGE PDF
-        # ------------------------------------------------------------
         overlay_pdf = PdfReader(overlay_buffer)
         writer = PdfWriter()
 
