@@ -10,8 +10,21 @@ from reportlab.graphics import renderPDF
 from reportlab.lib.units import mm
 from pypdf import PdfReader, PdfWriter
 
+# ============================================================
+# FUNZIONE RESET
+# ============================================================
+def reset_fields():
+    st.session_state["targa"] = ""
+    st.session_state["tipo"] = ""
+    st.session_state["hub"] = ""
+    st.session_state["sc_choice"] = ""
+    st.session_state["sc_value"] = ""
+
 st.title("Compilatore LQR UPS — Barcode Vettoriali")
 
+# ============================================================
+# 1) UPLOAD PDF TEMPLATE
+# ============================================================
 uploaded_pdf = st.file_uploader("Carica il PDF LQR (es: LQR 2004.pdf)", type="pdf")
 
 if uploaded_pdf:
@@ -20,13 +33,19 @@ if uploaded_pdf:
 
     st.success("PDF LQR caricato correttamente.")
 
-    raw_targa = st.text_input("Inserisci la targa del mezzo/cassa:")
+    # ============================================================
+    # 2) INPUT TARGA
+    # ============================================================
+    raw_targa = st.text_input("Inserisci la targa del mezzo/cassa:", key="targa")
     targa = re.sub(r"[^A-Za-z0-9]", "", raw_targa).upper()
 
     if raw_targa and not targa:
         st.error("La targa deve contenere solo lettere e numeri.")
 
-    tipo = st.selectbox("Tipo mezzo", ["", "NAVETTA", "BILICO", "CASSA"])
+    # ============================================================
+    # 3) INPUT TIPO
+    # ============================================================
+    tipo = st.selectbox("Tipo mezzo", ["", "NAVETTA", "BILICO", "CASSA"], key="tipo")
 
     prefissi = {
         "NAVETTA": "OWZ",
@@ -34,13 +53,16 @@ if uploaded_pdf:
         "CASSA": "UPST"
     }
 
+    # ============================================================
+    # 4) HUB (solo NAVETTA)
+    # ============================================================
     hub = None
     hub_code = None
     hub_num = None
     hub_letter = "T"
 
-    if tipo == "NAVETTA":
-        hub = st.selectbox("Seleziona HUB", ["", "BLQ", "BGY"])
+    if st.session_state["tipo"] == "NAVETTA":
+        hub = st.selectbox("Seleziona HUB", ["", "BLQ", "BGY"], key="hub")
 
         if hub == "BLQ":
             hub_code = "IT"
@@ -49,15 +71,21 @@ if uploaded_pdf:
             hub_code = "IT"
             hub_num = "3489"
 
-    sc_choice = st.selectbox("Vuoi inserire un SC ufficiale UPS?", ["NO", "SI"])
+    # ============================================================
+    # 5) SC opzionale
+    # ============================================================
+    sc_choice = st.selectbox("Vuoi inserire un SC ufficiale UPS?", ["NO", "SI"], key="sc_choice")
 
     sc_value = None
-    if sc_choice == "SI":
-        sc_value = st.text_input("Inserisci SC (es: SC1234567890)").upper()
+    if st.session_state["sc_choice"] == "SI":
+        sc_value = st.text_input("Inserisci SC (es: SC1234567890)", key="sc_value").upper()
         if sc_value and not re.match(r"^SC\d{10}$", sc_value):
             st.error("SC NON valido. Deve essere 'SC' + 10 numeri.")
             sc_value = None
 
+    # ============================================================
+    # 6) GENERA PDF
+    # ============================================================
     if st.button("Genera PDF LQR"):
 
         if not targa:
@@ -72,6 +100,9 @@ if uploaded_pdf:
             st.error("Seleziona l'HUB.")
             st.stop()
 
+        # ------------------------------------------------------------
+        # CREA OVERLAY
+        # ------------------------------------------------------------
         overlay_buffer = BytesIO()
         c = canvas.Canvas(overlay_buffer, pagesize=letter)
 
@@ -80,33 +111,42 @@ if uploaded_pdf:
         c.setFillColor(black)
         c.drawString(100, 720, oggi)
 
+        # Codici fissi
         c.drawString(142, 720, "IT")
         c.drawString(170, 720, "4138")
         c.drawString(212, 720, "L")
 
+        # HUB dinamico
         if tipo == "NAVETTA":
             c.drawString(25, 618, hub_code)
             c.drawString(55, 618, hub_num)
             c.drawString(95, 618, hub_letter)
+
         elif tipo == "CASSA":
             c.drawString(25, 618, "IT")
             c.drawString(55, 618, "4219")
             c.drawString(95, 618, "T")
+
         elif tipo == "BILICO":
             c.drawString(25, 618, "IT")
             c.drawString(55, 618, "2009")
             c.drawString(95, 618, "N")
 
+        # Targa
         c.drawCentredString(52, 705, targa)
 
+        # ------------------------------------------------------------
+        # FUNZIONE PER BARCODE VETTORIALE + TESTO + RETTANGOLO
+        # ------------------------------------------------------------
         def draw_scaled_barcode(c, value, box_x1, box_y1, box_x2, box_y2):
             box_w = box_x2 - box_x1
             box_h = box_y2 - box_y1
 
-            # patch bianco, stessa altezza per tutti
+            # rettangolo bianco uniforme
             c.setFillColor(white)
             c.rect(box_x1, box_y1, box_w, box_h, fill=1, stroke=0)
 
+            # barcode vettoriale
             bc = createBarcodeDrawing(
                 "Code128",
                 value=value,
@@ -120,7 +160,7 @@ if uploaded_pdf:
                 (box_h * 0.6) / bc.height
             )
 
-            # barcode centrato verticalmente nel rettangolo
+            # barcode centrato verticalmente
             x = box_x1 + (box_w - bc.width * scale) / 2
             y = box_y1 + (box_h - bc.height * scale) / 2
 
@@ -130,27 +170,33 @@ if uploaded_pdf:
             renderPDF.draw(bc, c, 0, 0)
             c.restoreState()
 
-            # testo subito sotto il barcode (calcolato rispetto al fondo del barcode)
-            barcode_bottom_y = y  # y è il bottom del barcode
-            text_y = barcode_bottom_y - 12  # 6 punti sotto il barcode
+            # testo subito sotto il barcode
+            text_y = y - 12  # distanza minima
 
             c.setFillColor(black)
             c.setFont("Helvetica", 8)
             c.drawCentredString(box_x1 + box_w / 2, text_y, value)
 
+        # ------------------------------------------------------------
+        # BARCODE TARGA
+        # ------------------------------------------------------------
         prefisso = prefissi[tipo]
         barcode_value = f"{prefisso}{targa}E"
 
-        # stessa altezza rettangoli, barcodes allineati
-        # fascia verticale comune, es. 140–240
         draw_scaled_barcode(c, barcode_value, 20, 140, 248, 240)
 
+        # ------------------------------------------------------------
+        # BARCODE SC (se presente)
+        # ------------------------------------------------------------
         if sc_value:
             draw_scaled_barcode(c, sc_value, 415, 140, 570, 240)
 
         c.save()
         overlay_buffer.seek(0)
 
+        # ------------------------------------------------------------
+        # MERGE PDF
+        # ------------------------------------------------------------
         overlay_pdf = PdfReader(overlay_buffer)
         writer = PdfWriter()
 
@@ -166,9 +212,13 @@ if uploaded_pdf:
 
         st.success("PDF generato correttamente.")
 
+        # ------------------------------------------------------------
+        # DOWNLOAD + RESET AUTOMATICO
+        # ------------------------------------------------------------
         st.download_button(
             "Scarica PDF",
             data=output_buffer.getvalue(),
             file_name=filename,
-            mime="application/pdf"
+            mime="application/pdf",
+            on_click=reset_fields
         )
