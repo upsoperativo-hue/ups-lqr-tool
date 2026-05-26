@@ -1,5 +1,6 @@
 import streamlit as st
 import re
+import uuid
 from datetime import datetime
 from io import BytesIO
 from reportlab.pdfgen import canvas
@@ -73,16 +74,33 @@ if st.session_state["tipo"] == "NAVETTA":
         hub_num = "3489"
 
 # ============================================================
-# SC opzionale
+# SC opzionale (senza suggerimenti del browser)
 # ============================================================
 sc_choice = st.selectbox("Vuoi inserire un SC ufficiale UPS?", ["NO", "SI"], key="sc_choice")
 
 sc_value = None
 if st.session_state["sc_choice"] == "SI":
-    sc_value = st.text_input("Inserisci SC (es: SC1234567890)", key="sc_value").upper()
+
+    # name HTML unico → il browser NON suggerisce più SC precedenti
+    unique_name = f"sc_input_{uuid.uuid4().hex}"
+
+    sc_value = st.text_input(
+        "Inserisci SC (es: SC1234567890)",
+        key="sc_value",
+        placeholder="SC1234567890",
+        kwargs={"name": unique_name}
+    ).upper()
+
     if sc_value and not re.match(r"^SC\d{10}$", sc_value):
         st.error("SC NON valido. Deve essere 'SC' + 10 numeri.")
         sc_value = None
+
+# ============================================================
+# PULSANTE RESET MANUALE
+# ============================================================
+if st.button("Reset campi"):
+    reset_fields()
+    st.experimental_rerun()
 
 # ============================================================
 # GENERA PDF
@@ -172,7 +190,7 @@ if st.button("Genera PDF LQR"):
         c.restoreState()
 
         # testo subito sotto il barcode
-        text_y = y - 12
+        text_y = y - 6
 
         c.setFillColor(black)
         c.setFont("Helvetica", 8)
